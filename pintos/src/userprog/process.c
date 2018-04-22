@@ -93,9 +93,9 @@ start_process (void *file_name_)
     printf("length is %d\n",i );
      int len = i;
      int str_len;
-     int *ptr[len];
+     uint32_t *ptr[len];
      int itr = 0;
-     int *last;
+     uint32_t*last;
 
      for(int j = len-1 ;j>=0;j--){
 
@@ -111,29 +111,31 @@ start_process (void *file_name_)
       printf("Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
       printf("value is %s\n",if_.esp );
       ptr[itr] = (uint32_t)if_.esp;
-      printf("addes value is %d\n",ptr[itr] );
+      printf("addes value is %" PRIu32 "\n",ptr[itr] );
       itr++;
      }
-     
-     if_.esp--;
+     if_.esp-= 1;
      *((char *)if_.esp) = '\0';
-     printf("Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
-    printf("value is %d\n",if_.esp );
+     if_.esp-= 4;
+     *((uint32_t *)if_.esp) = (uint32_t)NULL;
+
+     printf("after loop Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
+    printf("value is %" PRIu32 "\n",if_.esp );
     for(int j = itr;j>=0;j--){
-      if_.esp--;
+      //if_.esp--;
       if_.esp = if_.esp - 4;
-      printf("address is  %d\n",(int)ptr[j] );
-      *((int *)if_.esp) = (int)ptr[j];
+      //printf("address is  %d\n",(int)ptr[j] );
+      *((uint32_t *)if_.esp) = (uint32_t)ptr[j];
     }
     printf("Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
-    printf("value is %d\n",if_.esp );
+    printf("value is %" PRIu32 "\n",if_.esp );
     last = if_.esp;
-    if_.esp = if_.esp - 5;
-    *((int *)if_.esp) = (int)last;
-    if_.esp -= 5;
+    if_.esp = if_.esp - 4;
+    *((uint32_t *)if_.esp) = (uint32_t)last;
+    if_.esp -= 4;
     *((int *)if_.esp) = len;
-    if_.esp -= 5;
-    *((int *)if_.esp) = 0;
+    if_.esp -= 4;
+    *((uint32_t *)if_.esp) = (uint32_t)NULL;
   }
   /* If load failed, quit. */
   palloc_free_page (file_name);
