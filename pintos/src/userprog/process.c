@@ -96,17 +96,18 @@ start_process (void *file_name_)
      uint32_t *ptr[len];
      int itr = 0;
      uint32_t*last;
-
+     uint32_t stringptr;
      for(int j = len-1 ;j>=0;j--){
 
-      if_.esp--;
+      //if_.esp--;
 
       //*((char *)if_.esp) = '\0';
       str_len = strlen(cmd_arr[j]);
       printf("string length %d\n", str_len);
-      if_.esp = if_.esp - str_len * sizeof(char);
+      if_.esp = if_.esp - ((str_len+1) * sizeof(char));
+      stringptr = if_.esp;
       strlcpy(if_.esp , cmd_arr[j],str_len+1);
-      
+      //printf("string copied:%s\n", if_.esp);
       printf("PHYS_BASE is %d\n", PHYS_BASE - if_.esp );
       printf("Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
       printf("value is %s\n",if_.esp );
@@ -121,21 +122,31 @@ start_process (void *file_name_)
 
      printf("after loop Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
     printf("value is %" PRIu32 "\n",if_.esp );
-    for(int j = itr;j>=0;j--){
+    for(int j = itr-1;j>=0;j--){
       //if_.esp--;
       if_.esp = if_.esp - 4;
-      //printf("address is  %d\n",(int)ptr[j] );
-      *((uint32_t *)if_.esp) = (uint32_t)ptr[j];
+      printf("ptr %" PRIu32 "\n",(uint32_t)ptr[j] );
+      *((uint32_t *)if_.esp) = ptr[j];
+      //memcpy(if_.esp, &ptr[j], 4);
+      printf("value added %" PRIu32 "\n", *(uint32_t *)if_.esp);
     }
     printf("Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
     printf("value is %" PRIu32 "\n",if_.esp );
     last = if_.esp;
     if_.esp = if_.esp - 4;
-    *((uint32_t *)if_.esp) = (uint32_t)last;
+    //*((uint32_t *)if_.esp) = (uint32_t)last;
+    memcpy(if_.esp, &last, 4);
     if_.esp -= 4;
-    *((int *)if_.esp) = len;
+    //*((int *)if_.esp) = len;
+    memcpy(if_.esp, &len, 4);
     if_.esp -= 4;
-    *((uint32_t *)if_.esp) = (uint32_t)NULL;
+    //((uint32_t *)if_.esp) = (uint32_t)NULL;
+    int end = 0;
+    memcpy(if_.esp, &end, 4);
+    printf("after loop Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
+    printf("after loop Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)PHYS_BASE);
+    printf("the cpied string is:%s\n", stringptr);
+    hex_dump((uintptr_t)if_.esp,PHYS_BASE,sizeof(char)*(PHYS_BASE-if_.esp),true);
   }
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -519,7 +530,7 @@ setup_stack (void **esp)
         palloc_free_page (kpage);
     }
     printf("\nI AM HERE --- ---------\n");
-    hex_dump((uintptr_t)*esp,*esp,sizeof(char)*8,true);
+    //hex_dump((uintptr_t)*esp,*esp,sizeof(char)*8,true);
   return success;
 }
 
