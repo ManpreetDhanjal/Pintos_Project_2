@@ -109,6 +109,7 @@ start_process (void *file_name_)
     *if_.esp = len;
     if_.esp -= 5;
     *if_.esp = 0;
+  }
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
