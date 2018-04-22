@@ -33,6 +33,8 @@ process_execute (const char *file_name)
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
+  
+
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
@@ -53,14 +55,60 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
+  char s[] = file_name;
+  char *token, *save_ptr;
+  int prev_sz;
+  int tok_len;
+  char **cmd_arr = NULL;
 
+  int i = 0;
+   for (token = strtok_r (s, " ", &save_ptr); token != NULL;token = strtok_r (NULL, " ", &save_ptr)){
+      prev_sz = (cmd_arr==NULL) ? 0 : sizeof(cmd_arr)/sizeof(cmd_arr[0]);
+      cmd_arr = realloc(cmd_arr,(prev_sz + 1)*sizeof(char));
+      tok_len = strlen(token);
+      cmd_arr[i] = malloc((tok_len+1) * sizeof(char));
+      strcpy(cmd_arr[i], token);
+      cmd_arr[i][tok_len] = '\0';
+      i++;
+   }
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load (cmd_arr[0], &if_.eip, &if_.esp);
+  if(success){
+     int len = i;
+     
+     char *data;
+     int str_len;
+     int *ptr[len];
+     int itr = 0;
+     int *last;
+     for(int j = len-1 ;j>=0;j--){
+      if_.esp--;
+      str_len = strlen(cmd_arr[j]);
+      if_.esp = if_.esp - str_len * sizeof(char);
+      strcpy(if_.esp , cmd_arr[j]);
+      ptr[itr] = if_.esp;
+      itr++;
+     }
+     
+     if_.esp--;
+     *if_.esp = '\0';
 
+    for(int j = itr;j>=0;j--){
+      if_.esp--;
+      if_.esp = if_.esp - 4;
+      *if_.esp = ptr[j];
+    }
+    last = if_.esp;
+    if_.esp = if_.esp - 5;
+    *if_.esp = last;
+    if_.esp -= 5;
+    *if_.esp = len;
+    if_.esp -= 5;
+    *if_.esp = 0;
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
