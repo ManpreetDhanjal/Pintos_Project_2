@@ -17,6 +17,8 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
+
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -34,16 +36,22 @@ process_execute (const char *file_name)
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   
-
+  printf("IN PROCESS EXECUTE\n");
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
+  
+  char *save_ptr;
+  char *token = strtok_r (file_name, " ", &save_ptr);
   strlcpy (fn_copy, file_name, PGSIZE);
-
+  printf("FIle name is %s\n", token);
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
+  if (tid == TID_ERROR){
+     palloc_free_page (fn_copy); 
+     printf("THREAD EXIT\n");
+  }
+   
   return tid;
 }
 
@@ -52,23 +60,25 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
+  printf("IN START PROCESS\n");
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-  char s[] = file_name;
+  //char s[] = (char *)file_name_;
   char *token, *save_ptr;
   int prev_sz;
   int tok_len;
   char **cmd_arr = NULL;
 
   int i = 0;
-   for (token = strtok_r (s, " ", &save_ptr); token != NULL;token = strtok_r (NULL, " ", &save_ptr)){
+   for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;token = strtok_r (NULL, " ", &save_ptr)){
       prev_sz = (cmd_arr==NULL) ? 0 : sizeof(cmd_arr)/sizeof(cmd_arr[0]);
-      cmd_arr = realloc(cmd_arr,(prev_sz + 1)*sizeof(char));
+      cmd_arr = (char **)realloc(cmd_arr,(prev_sz + 1)*sizeof(char));
       tok_len = strlen(token);
-      cmd_arr[i] = malloc((tok_len+1) * sizeof(char));
-      strcpy(cmd_arr[i], token);
+      cmd_arr[i] = (char *)malloc((tok_len+1) * sizeof(char));
+      strlcpy(cmd_arr[i], token,tok_len+1);
       cmd_arr[i][tok_len] = '\0';
+      printf("TOKEN IS %s\n", cmd_arr[i]);
       i++;
    }
   /* Initialize interrupt frame and load executable. */
@@ -78,37 +88,43 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (cmd_arr[0], &if_.eip, &if_.esp);
   if(success){
+    printf("length is %d\n",i );
      int len = i;
-     
-     char *data;
      int str_len;
      int *ptr[len];
      int itr = 0;
      int *last;
+
      for(int j = len-1 ;j>=0;j--){
+
       if_.esp--;
+      
       str_len = strlen(cmd_arr[j]);
+      printf("string length %d\n", str_len);
       if_.esp = if_.esp - str_len * sizeof(char);
-      strcpy(if_.esp , cmd_arr[j]);
+      strlcpy(if_.esp , cmd_arr[j],str_len);
+
+      printf("PHYS_BASE is %d\n", PHYS_BASE - if_.esp );
       ptr[itr] = if_.esp;
       itr++;
      }
      
      if_.esp--;
-     *if_.esp = '\0';
+     *((char *)if_.esp) = '\0';
 
     for(int j = itr;j>=0;j--){
       if_.esp--;
       if_.esp = if_.esp - 4;
-      *if_.esp = ptr[j];
+      
+      *((int *)if_.esp) = (int)ptr[j];
     }
     last = if_.esp;
     if_.esp = if_.esp - 5;
-    *if_.esp = last;
+    *((int *)if_.esp) = (int)last;
     if_.esp -= 5;
-    *if_.esp = len;
+    *((int *)if_.esp) = len;
     if_.esp -= 5;
-    *if_.esp = 0;
+    *((int *)if_.esp) = 0;
   }
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -137,6 +153,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  while(1);
   return -1;
 }
 
@@ -490,6 +507,8 @@ setup_stack (void **esp)
       else
         palloc_free_page (kpage);
     }
+    printf("\nI AM HERE --- ---------\n");
+    hex_dump((uintptr_t)*esp,*esp,sizeof(char)*8,true);
   return success;
 }
 
