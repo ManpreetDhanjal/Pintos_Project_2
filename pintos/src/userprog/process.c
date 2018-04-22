@@ -62,7 +62,7 @@ static void
 start_process (void *file_name_)
 {
   
-  char *file_name = file_name_;
+  char *file_name = (char*)file_name_;
   printf("IN START PROCESS %s \n",file_name);
   struct intr_frame if_;
   bool success;
@@ -71,11 +71,11 @@ start_process (void *file_name_)
   int prev_sz;
   int tok_len;
   char **cmd_arr = NULL;
-
+  
   int i = 0;
    for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;token = strtok_r (NULL, " ", &save_ptr)){
-      prev_sz = (cmd_arr==NULL) ? 0 : sizeof(cmd_arr)/sizeof(cmd_arr[0]);
-      cmd_arr = (char **)realloc(cmd_arr,(prev_sz + 1)*sizeof(char));
+      prev_sz = i;
+      cmd_arr = (char **)realloc(cmd_arr,(prev_sz + 1)*sizeof(char*));
       tok_len = strlen(token);
       cmd_arr[i] = (char *)malloc((tok_len+1) * sizeof(char));
       strlcpy(cmd_arr[i], token,tok_len+1);
@@ -88,6 +88,7 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+  printf("file name is --%s--\n", cmd_arr[0]);
   success = load (cmd_arr[0], &if_.eip, &if_.esp);
   if(success){
     printf("length is %d\n",i );
@@ -99,54 +100,35 @@ start_process (void *file_name_)
      uint32_t stringptr;
      for(int j = len-1 ;j>=0;j--){
 
-      //if_.esp--;
+      if_.esp--;
 
-      //*((char *)if_.esp) = '\0';
       str_len = strlen(cmd_arr[j]);
-      printf("string length %d\n", str_len);
-      if_.esp = if_.esp - ((str_len+1) * sizeof(char));
+      if_.esp = if_.esp - ((str_len) * sizeof(char));
       stringptr = if_.esp;
-      strlcpy(if_.esp , cmd_arr[j],str_len+1);
-      //printf("string copied:%s\n", if_.esp);
-      printf("PHYS_BASE is %d\n", PHYS_BASE - if_.esp );
-      printf("Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
-      printf("value is %s\n",if_.esp );
+      strlcpy((char*)if_.esp ,cmd_arr[j],str_len+1);
       ptr[itr] = (uint32_t)if_.esp;
-      printf("addes value is %" PRIu32 "\n",ptr[itr] );
       itr++;
      }
      if_.esp-= 1;
      *((char *)if_.esp) = '\0';
-     if_.esp-= 4;
-     *((uint32_t *)if_.esp) = (uint32_t)NULL;
+     ////if_.esp-= 4;
+     //*((uint32_t *)if_.esp) = (uint32_t)NULL;
 
-     printf("after loop Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
-    printf("value is %" PRIu32 "\n",if_.esp );
     for(int j = itr-1;j>=0;j--){
       //if_.esp--;
       if_.esp = if_.esp - 4;
-      printf("ptr %" PRIu32 "\n",(uint32_t)ptr[j] );
-      *((uint32_t *)if_.esp) = ptr[j];
-      //memcpy(if_.esp, &ptr[j], 4);
-      printf("value added %" PRIu32 "\n", *(uint32_t *)if_.esp);
+      memcpy((uint32_t*)if_.esp, &ptr[j], 4);
     }
-    printf("Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
-    printf("value is %" PRIu32 "\n",if_.esp );
-    last = if_.esp;
+    last = (uint32_t)if_.esp;
     if_.esp = if_.esp - 4;
-    //*((uint32_t *)if_.esp) = (uint32_t)last;
-    memcpy(if_.esp, &last, 4);
+    memcpy((uint32_t*)if_.esp, &last, 4);
     if_.esp -= 4;
     //*((int *)if_.esp) = len;
-    memcpy(if_.esp, &len, 4);
+    memcpy((uint32_t*)if_.esp, &len, 4);
     if_.esp -= 4;
-    //((uint32_t *)if_.esp) = (uint32_t)NULL;
     int end = 0;
-    memcpy(if_.esp, &end, 4);
-    printf("after loop Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
-    printf("after loop Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)PHYS_BASE);
-    printf("the cpied string is:%s\n", stringptr);
-    hex_dump((uintptr_t)if_.esp,PHYS_BASE,sizeof(char)*(PHYS_BASE-if_.esp),true);
+    memcpy((uint32_t*)if_.esp, &end, 4);
+    hex_dump((uintptr_t)if_.esp,(char*)if_.esp,sizeof(char)*(PHYS_BASE-if_.esp),true);
   }
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -529,7 +511,7 @@ setup_stack (void **esp)
       else
         palloc_free_page (kpage);
     }
-    printf("\nI AM HERE --- ---------\n");
+    printf("\nI AM HERE ------------\n");
     //hex_dump((uintptr_t)*esp,*esp,sizeof(char)*8,true);
   return success;
 }
