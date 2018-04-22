@@ -80,7 +80,6 @@ start_process (void *file_name_)
       cmd_arr[i] = (char *)malloc((tok_len+1) * sizeof(char));
       strlcpy(cmd_arr[i], token,tok_len+1);
       cmd_arr[i][tok_len] = '\0';
-      printf("TOKEN IS %s\n", cmd_arr[i]);
       i++;
    }
   /* Initialize interrupt frame and load executable. */
@@ -88,10 +87,8 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  printf("file name is --%s--\n", cmd_arr[0]);
   success = load (cmd_arr[0], &if_.eip, &if_.esp);
   if(success){
-    printf("length is %d\n",i );
      int len = i;
      int str_len;
      uint32_t *ptr[len];
