@@ -42,8 +42,9 @@ process_execute (const char *file_name)
     return TID_ERROR;
   
   char *save_ptr;
-  char *token = strtok_r (file_name, " ", &save_ptr);
   strlcpy (fn_copy, file_name, PGSIZE);
+  char *token = strtok_r (file_name, " ", &save_ptr);
+  
   printf("FIle name is %s\n", token);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
@@ -60,8 +61,9 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
-  printf("IN START PROCESS\n");
+  
   char *file_name = file_name_;
+  printf("IN START PROCESS %s \n",file_name);
   struct intr_frame if_;
   bool success;
   //char s[] = (char *)file_name_;
@@ -98,26 +100,33 @@ start_process (void *file_name_)
      for(int j = len-1 ;j>=0;j--){
 
       if_.esp--;
-      
+
+      //*((char *)if_.esp) = '\0';
       str_len = strlen(cmd_arr[j]);
       printf("string length %d\n", str_len);
       if_.esp = if_.esp - str_len * sizeof(char);
-      strlcpy(if_.esp , cmd_arr[j],str_len);
-
+      strlcpy(if_.esp , cmd_arr[j],str_len+1);
+      
       printf("PHYS_BASE is %d\n", PHYS_BASE - if_.esp );
-      ptr[itr] = if_.esp;
+      printf("Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
+      printf("value is %s\n",if_.esp );
+      ptr[itr] = (uint32_t)if_.esp;
+      printf("addes value is %d\n",ptr[itr] );
       itr++;
      }
      
      if_.esp--;
      *((char *)if_.esp) = '\0';
-
+     printf("Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
+    printf("value is %d\n",if_.esp );
     for(int j = itr;j>=0;j--){
       if_.esp--;
       if_.esp = if_.esp - 4;
-      
+      printf("address is  %d\n",(int)ptr[j] );
       *((int *)if_.esp) = (int)ptr[j];
     }
+    printf("Pointer address is at 0x%" PRIXPTR "\n", (uintptr_t)if_.esp);
+    printf("value is %d\n",if_.esp );
     last = if_.esp;
     if_.esp = if_.esp - 5;
     *((int *)if_.esp) = (int)last;
