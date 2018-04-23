@@ -80,6 +80,10 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+
+struct blockedNode{
+  struct semaphore sema;
+}
 struct thread
   {
     /* Owned by thread.c. */
@@ -96,6 +100,9 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct list child_list;
+    struct blockedNode* parent_sema_ref;
+    struct thread* parent_ref;
 #endif
 
     /* Owned by thread.c. */
@@ -137,5 +144,14 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+struct child_status
+{
+  tid_t child_id;
+  int exit_status;
+  bool is_wait_called;
+  struct list_elem elem;
+  struct list_elem allelem;
+}
 
 #endif /* threads/thread.h */

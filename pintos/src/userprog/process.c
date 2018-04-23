@@ -18,7 +18,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
-
+#include "threads/synch.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -125,7 +125,7 @@ start_process (void *file_name_)
     if_.esp -= 4;
     int end = 0;
     memcpy((uint32_t*)if_.esp, &end, 4);
-    hex_dump((uintptr_t)if_.esp,(char*)if_.esp,sizeof(char)*(PHYS_BASE-if_.esp),true);
+    ((uintptr_t)if_.esp,(char*)if_.esp,sizeof(char)*(PHYS_BASE-if_.esp),true);
   }
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -154,8 +154,26 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  while(1);
-  return -1;
+   if(child_tid == NULL) return -1;
+   struct blocked_node* bn = (struct blocked_node*)malloc(sizeof(struct blocked_node));
+   sema_init(&bn->sema,0);
+   struct list child_list=thread_current()->child_list;
+   struct list_elem* e;
+   struct child_status child_ref;
+   struct thread* child_thread_ref = NULL;
+   for (e = list_begin (&child_list); e != list_end (&child_list); e = list_next (e)){
+            struct child_status* temp = list_entry(e, struct child_status, elem);
+            if(temp->child_id == child_tid){
+              child_ref=temp;
+              child_thread_ref = list_entry(&(child_ref.allelem), struct thread, allelem);
+              child_thread_ref->parent_sema_ref = bn;
+              break;
+            }
+   }
+   if(child_thread_ref == NULL){
+      return -1;
+   }
+   sema_down(&bn->sema);
 }
 
 /* Free the current process's resources. */
@@ -177,9 +195,12 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
+      /*
+      */
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
+
     }
 }
 
