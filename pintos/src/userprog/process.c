@@ -23,6 +23,37 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+int 
+parent_sema(bool from_wait){
+  struct blocked_node* bn = (struct blocked_node*)malloc(sizeof(struct blocked_node));
+   sema_init(&bn->sema,0);
+   struct list child_list=thread_current()->child_list;
+   struct list_elem* e;
+   struct child_status child_ref;
+   struct thread* child_thread_ref = NULL;
+   int *child_status;
+   for (e = list_begin (&child_list); e != list_end (&child_list); e = list_next (e)){
+            struct child_status* temp = list_entry(e, struct child_status, elem);
+            if(temp->child_id == child_tid){
+              child_ref=temp;
+              child_thread_ref = list_entry(&(child_ref.allelem), struct thread, allelem);
+              child_thread_ref->parent_sema_ref = bn;
+              child_status = &temp->exit_status;
+              if(temp->is_wait_called == true || temp->exit_status == -1){
+                return -1;
+              }
+              temp->is_wait_called = from_wait;
+              break;
+            }
+   }
+   if(child_thread_ref == NULL){
+      return -1;
+   }
+   sema_down(&bn->sema);
+   // reference will change or not?
+   return *child_status;
+}
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -52,7 +83,13 @@ process_execute (const char *file_name)
      palloc_free_page (fn_copy); 
      printf("THREAD EXIT\n");
   }
-   
+  //add to parent's child_list
+  //call sema_down on thread_current->child child ref from allelem -> parent_sema_ref
+  if(parent_sema(false) == -1){
+    return -1;
+  }
+  //if not successful i.e exit_status is -1 "remove" ??  from parent's child_list and return tiderror
+  // else return tid;
   return tid;
 }
 
@@ -87,6 +124,11 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+
+  //add the child in parent's thread child list in all the cases even if load is failed
+  //to ensure that we can return its status in case of kernel termination
+
+
   success = load (cmd_arr[0], &if_.eip, &if_.esp);
   if(success){
      int len = i;
@@ -127,10 +169,29 @@ start_process (void *file_name_)
     memcpy((uint32_t*)if_.esp, &end, 4);
     ((uintptr_t)if_.esp,(char*)if_.esp,sizeof(char)*(PHYS_BASE-if_.esp),true);
   }
+  struct thread *cur = thread_current ();
+  if(cur->parent_ref != NULL){
+     struct list child_list=cur->parent_ref->child_list;
+     struct list_elem* e;
+     tid_t thread_current_id = cur->tid;
+     for (e = list_begin (&child_list); e != list_end (&child_list); e = list_next (e)){
+              struct child_status* temp = list_entry(e, struct child_status, elem);
+              if(temp->child_id == thread_current_id){
+                if(!success)
+                  temp->exit_status = -1;
+                break;
+              }
+     }
+  }
+  sema_up(&(thread_current()->parent_sema_ref->sema));
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
+  if (!success) {
+    //in case of load fail sema up the parent
+    //child has not been added uptil now in the parent's thread child_list
+    
     thread_exit ();
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -141,6 +202,9 @@ start_process (void *file_name_)
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
+
+
+
 
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
@@ -154,26 +218,10 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+
    if(child_tid == NULL) return -1;
-   struct blocked_node* bn = (struct blocked_node*)malloc(sizeof(struct blocked_node));
-   sema_init(&bn->sema,0);
-   struct list child_list=thread_current()->child_list;
-   struct list_elem* e;
-   struct child_status child_ref;
-   struct thread* child_thread_ref = NULL;
-   for (e = list_begin (&child_list); e != list_end (&child_list); e = list_next (e)){
-            struct child_status* temp = list_entry(e, struct child_status, elem);
-            if(temp->child_id == child_tid){
-              child_ref=temp;
-              child_thread_ref = list_entry(&(child_ref.allelem), struct thread, allelem);
-              child_thread_ref->parent_sema_ref = bn;
-              break;
-            }
-   }
-   if(child_thread_ref == NULL){
-      return -1;
-   }
-   sema_down(&bn->sema);
+   return parent_sema(true);
+   
 }
 
 /* Free the current process's resources. */

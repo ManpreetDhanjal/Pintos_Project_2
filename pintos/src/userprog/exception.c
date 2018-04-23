@@ -71,6 +71,20 @@ exception_print_stats (void)
 static void
 kill (struct intr_frame *f) 
 {
+  struct thread *cur = thread_current ();
+  if(cur->parent_ref != NULL){
+     struct list child_list=cur->parent_ref->child_list;
+     struct list_elem* e;
+     tid_t thread_current_id = cur->tid;
+     for (e = list_begin (&child_list); e != list_end (&child_list); e = list_next (e)){
+              struct child_status* temp = list_entry(e, struct child_status, elem);
+              if(temp->child_id == thread_current_id){
+                temp->exit_status = -1;
+                break;
+              }
+     }
+  }
+
   /* This interrupt is one (probably) caused by a user process.
      For example, the process might have tried to access unmapped
      virtual memory (a page fault).  For now, we simply kill the

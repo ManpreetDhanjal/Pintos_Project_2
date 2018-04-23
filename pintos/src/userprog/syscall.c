@@ -18,7 +18,7 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
   printf ("system call!\n");
-  if(esp==NULL || esp <= PHYS_BASE){
+  if(esp==NULL || esp >= PHYS_BASE){
   	  exit(-1);
   }
   lock_acquire(&syscall_lock);
@@ -26,16 +26,24 @@ syscall_handler (struct intr_frame *f UNUSED)
   switch(sys_code)
    {
    	case SYS_HALT: 
-   	shutdown_power_off();
+   	halt();
    	printf("Choice is 1");
     break;
 
     case SYS_EXIT: 
+    exit(*((int*)f->esp+1));
+    f->eax = status;
     printf("Choice is 2");
     break;
 
     case SYS_WAIT: 
     printf("Choice is 3");
+    f->eax = wait((pid_t)*((int*)f->esp+1));
+    break;
+
+    case SYS_EXEC: 
+    printf("Choice is 3");
+    f->eax = exec((char *)*((int*)f->esp+1));
     break;
 
     case SYS_CREATE: 
@@ -76,9 +84,14 @@ syscall_handler (struct intr_frame *f UNUSED)
 }
 
 static void 
+halt (){
+  shutdown_power_off();
+}
+
+static void 
 exit(int status){
   struct thread *cur = thread_current ();
-  cur->
+  
   if(cur->parent_sema_ref != NULL){
   	sema_up(&(cur->parent_sema_ref->sema));
   	cur->parent_sema_ref = NULL;
@@ -100,3 +113,26 @@ exit(int status){
 
   thread_exit();
 }
+
+
+static int 
+wait(pid_t pid){
+  if(pid == -1)return -1;
+  return process_wait(pid);
+}
+
+
+pid_t int 
+exec(const char *cmd_line){
+  return process_execute(cmd_line);
+}
+
+
+
+
+
+
+
+
+
+

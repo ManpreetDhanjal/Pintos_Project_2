@@ -19,6 +19,7 @@
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
+#define INF 32676
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
@@ -182,7 +183,13 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-
+  #ifdef USERPROG
+    struct child_status *cs = (struct child_status*)malloc(sizeof(struct child_status));
+    cs->exit_status = INF;
+    cs->is_wait_called = false;
+    cs->allelem = &t->allelem;
+    list_insert (list_end (&(thread_current()->child_list)), cs);
+  #endif
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
@@ -463,7 +470,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-
+  #ifdef USERPROG
+    list_init (&t->child_list);
+    t->parent_sema_ref = NULL; 
+    t->parent_ref = thread_current();
+  #endif
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
