@@ -24,19 +24,19 @@ static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 int 
-parent_sema(bool from_wait){
+parent_sema(bool from_wait,tid_t child_tid){
   struct blocked_node* bn = (struct blocked_node*)malloc(sizeof(struct blocked_node));
    sema_init(&bn->sema,0);
    struct list child_list=thread_current()->child_list;
    struct list_elem* e;
-   struct child_status child_ref;
+   struct child_status* child_ref;
    struct thread* child_thread_ref = NULL;
    int *child_status;
    for (e = list_begin (&child_list); e != list_end (&child_list); e = list_next (e)){
             struct child_status* temp = list_entry(e, struct child_status, elem);
             if(temp->child_id == child_tid){
               child_ref=temp;
-              child_thread_ref = list_entry(&(child_ref.allelem), struct thread, allelem);
+              child_thread_ref = list_entry(&(child_ref->allelem), struct thread, allelem);
               child_thread_ref->parent_sema_ref = bn;
               child_status = &temp->exit_status;
               if(temp->is_wait_called == true || temp->exit_status == -1){
@@ -85,7 +85,7 @@ process_execute (const char *file_name)
   }
   //add to parent's child_list
   //call sema_down on thread_current->child child ref from allelem -> parent_sema_ref
-  if(parent_sema(false) == -1){
+  if(parent_sema(false,tid) == -1){
     return -1;
   }
   //if not successful i.e exit_status is -1 "remove" ??  from parent's child_list and return tiderror
@@ -220,7 +220,7 @@ process_wait (tid_t child_tid UNUSED)
 {
 
    if(child_tid == NULL) return -1;
-   return parent_sema(true);
+   return parent_sema(true,child_tid);
    
 }
 

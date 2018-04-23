@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -187,7 +188,7 @@ thread_create (const char *name, int priority,
     struct child_status *cs = (struct child_status*)malloc(sizeof(struct child_status));
     cs->exit_status = INF;
     cs->is_wait_called = false;
-    cs->allelem = &t->allelem;
+    cs->allelem = t->allelem;
     list_insert (list_end (&(thread_current()->child_list)), cs);
   #endif
   /* Stack frame for kernel_thread(). */

@@ -4,7 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-
+#include "synch.h"
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -81,9 +81,10 @@ typedef int tid_t;
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
 
-struct blockedNode{
+struct blocked_node{
   struct semaphore sema;
-}
+};
+
 struct thread
   {
     /* Owned by thread.c. */
@@ -152,6 +153,6 @@ struct child_status
   bool is_wait_called;
   struct list_elem elem;
   struct list_elem allelem;
-}
+};
 
 #endif /* threads/thread.h */
