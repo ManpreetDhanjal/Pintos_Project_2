@@ -1,10 +1,27 @@
 #include "userprog/syscall.h"
+#include "userprog/process.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "devices/shutdown.h"
+#include "threads/vaddr.h"
 static void syscall_handler (struct intr_frame *);
+
+void halt(void);
+void exit(int status);
+pid_t exec(const char *cmd_line);
+int wait(pid_t pid);
+bool create(const char *file, unsigned initial_size);
+bool remove(const char *file);
+int open(const char *file);
+int filesize(int fd);
+int read(int fd, void *buffer, unsigned size);
+int write(int fd, const void *buffer, unsigned size);
+void seek(int fd, unsigned position);
+unsigned tell(int fd);
+void close(int fd);
+
 struct lock syscall_lock;
 
 void
@@ -18,33 +35,33 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
   printf ("system call!\n");
-  if(esp==NULL || esp >= PHYS_BASE){
+  
+  if(f->esp==NULL || f->esp >= PHYS_BASE){
   	  exit(-1);
   }
   lock_acquire(&syscall_lock);
   int sys_code = *(int*)f->esp;
-  switch(sys_code)
-   {
-   	case SYS_HALT: 
+
+  switch(sys_code){
+   case SYS_HALT:
+        printf("--------------------Choice is halt---------------"); 
    	halt();
-   	printf("Choice is 1");
-    break;
+    	break;
 
     case SYS_EXIT: 
-    exit(*((int*)f->esp+1));
-    f->eax = status;
-    printf("Choice is 2");
-    break;
+	    printf("--------------------Choice is exit---------------");
+	    exit(*((int*)f->esp+1));
+	    break;
 
     case SYS_WAIT: 
-    printf("Choice is 3");
-    f->eax = wait((pid_t)*((int*)f->esp+1));
-    break;
+	    printf("--------------------Choice is wait---------------");
+	    f->eax = wait((pid_t)*((int*)f->esp+1));
+	    break;
 
     case SYS_EXEC: 
-    printf("Choice is 3");
-    f->eax = exec((char *)*((int*)f->esp+1));
-    break;
+	    printf("--------------------Choice is exec---------------");
+	    f->eax = exec((char *)*((int*)f->esp+1));
+	    break;
 
     case SYS_CREATE: 
     printf("Choice is 3");
@@ -83,12 +100,12 @@ syscall_handler (struct intr_frame *f UNUSED)
 
 }
 
-static void 
+void 
 halt (){
   shutdown_power_off();
 }
 
-static void 
+void 
 exit(int status){
   struct thread *cur = thread_current ();
   
@@ -115,14 +132,14 @@ exit(int status){
 }
 
 
-static int 
+int 
 wait(pid_t pid){
   if(pid == -1)return -1;
   return process_wait(pid);
 }
 
 
-pid_t int 
+pid_t
 exec(const char *cmd_line){
   return process_execute(cmd_line);
 }

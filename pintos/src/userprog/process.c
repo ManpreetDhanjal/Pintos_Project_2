@@ -133,17 +133,15 @@ start_process (void *file_name_)
   if(success){
      int len = i;
      int str_len;
-     uint32_t *ptr[len];
+     uint32_t ptr[len];
      int itr = 0;
-     uint32_t*last;
-     uint32_t stringptr;
+     uint32_t last;
      for(int j = len-1 ;j>=0;j--){
 
       if_.esp--;
 
       str_len = strlen(cmd_arr[j]);
       if_.esp = if_.esp - ((str_len) * sizeof(char));
-      stringptr = if_.esp;
       strlcpy((char*)if_.esp ,cmd_arr[j],str_len+1);
       ptr[itr] = (uint32_t)if_.esp;
       itr++;
@@ -167,7 +165,7 @@ start_process (void *file_name_)
     if_.esp -= 4;
     int end = 0;
     memcpy((uint32_t*)if_.esp, &end, 4);
-    ((uintptr_t)if_.esp,(char*)if_.esp,sizeof(char)*(PHYS_BASE-if_.esp),true);
+    hex_dump((uintptr_t)if_.esp,(char*)if_.esp,sizeof(char)*(PHYS_BASE-if_.esp),true);
   }
   struct thread *cur = thread_current ();
   if(cur->parent_ref != NULL){
@@ -219,7 +217,8 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
 
-   if(child_tid == NULL) return -1;
+   //while(1);
+   //if(child_tid == NULL) return -1;
    return parent_sema(true,child_tid);
    
 }
@@ -258,6 +257,7 @@ process_exit (void)
 void
 process_activate (void)
 {
+  printf("inside process activate method\n");
   struct thread *t = thread_current ();
 
   /* Activate thread's page tables. */

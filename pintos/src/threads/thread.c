@@ -175,7 +175,7 @@ thread_create (const char *name, int priority,
   tid_t tid;
 
   ASSERT (function != NULL);
-
+  printf("inside thread create method\n");
   /* Allocate thread. */
   t = palloc_get_page (PAL_ZERO);
   if (t == NULL)
@@ -189,7 +189,8 @@ thread_create (const char *name, int priority,
     cs->exit_status = INF;
     cs->is_wait_called = false;
     cs->allelem = t->allelem;
-    list_insert (list_end (&(thread_current()->child_list)), cs);
+    list_push_back (&thread_current()->child_list, &cs->elem);
+    
   #endif
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -280,6 +281,7 @@ thread_current (void)
 tid_t
 thread_tid (void) 
 {
+  printf("thread id\n");
   return thread_current ()->tid;
 }
 
@@ -460,7 +462,6 @@ static void
 init_thread (struct thread *t, const char *name, int priority)
 {
   enum intr_level old_level;
-
   ASSERT (t != NULL);
   ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
   ASSERT (name != NULL);
@@ -474,7 +475,7 @@ init_thread (struct thread *t, const char *name, int priority)
   #ifdef USERPROG
     list_init (&t->child_list);
     t->parent_sema_ref = NULL; 
-    t->parent_ref = thread_current();
+    t->parent_ref = running_thread()->status == THREAD_RUNNING ? thread_current() : NULL;
   #endif
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

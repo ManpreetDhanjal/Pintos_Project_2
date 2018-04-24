@@ -102,7 +102,7 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
     struct list child_list;
-    struct blockedNode* parent_sema_ref;
+    struct blocked_node* parent_sema_ref;
     struct thread* parent_ref;
 #endif
 
