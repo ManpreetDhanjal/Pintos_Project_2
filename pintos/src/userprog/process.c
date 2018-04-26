@@ -25,32 +25,41 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 int 
 parent_sema(bool from_wait,tid_t child_tid){
-  struct blocked_node* bn = (struct blocked_node*)malloc(sizeof(struct blocked_node));
+   struct blocked_node* bn = (struct blocked_node*)malloc(sizeof(struct blocked_node));
    sema_init(&bn->sema,0);
-   struct list child_list=thread_current()->child_list;
+   //struct list child_list=thread_current()->child_list;
    struct list_elem* e;
    struct child_status* child_ref;
    struct thread* child_thread_ref = NULL;
    int *child_status;
-   for (e = list_begin (&child_list); e != list_end (&child_list); e = list_next (e)){
+   printf("parent sema called for :%u\n", child_tid);
+   for (e = list_begin (&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)){
             struct child_status* temp = list_entry(e, struct child_status, elem);
             if(temp->child_id == child_tid){
               child_ref=temp;
-              child_thread_ref = list_entry(&(child_ref->allelem), struct thread, allelem);
-              child_thread_ref->parent_sema_ref = bn;
-              child_status = &temp->exit_status;
-              if(temp->is_wait_called == true || temp->exit_status == -1){
+    	      printf("child ref id:%u\n", child_ref->child_id);
+ 	      struct list_elem* thread_ref = child_ref->allelem;
+              child_thread_ref = list_entry(thread_ref, struct thread, allelem);
+              if(temp->is_wait_called == true){
                 return -1;
               }
+	      if(temp->exit_status != INF){
+		return temp->exit_status;
+	      }
+              child_thread_ref->parent_sema_ref = bn;
+              child_status = &temp->exit_status;
               temp->is_wait_called = from_wait;
               break;
             }
    }
+
    if(child_thread_ref == NULL){
+      printf("child_ref isnull------------\n");
       return -1;
    }
+printf("called sema donw\n");
    sema_down(&bn->sema);
-   // reference will change or not?
+printf("child status is:%d\n", *child_status);
    return *child_status;
 }
 
@@ -63,11 +72,11 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
-
+  
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   
-  printf("IN PROCESS EXECUTE\n");
+  //printf("IN PROCESS EXECUTE\n");
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
@@ -76,7 +85,7 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
   char *token = strtok_r (file_name, " ", &save_ptr);
   
-  printf("FIle name is %s\n", token);
+  //printf("FIle name is %s\n", token);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR){
@@ -86,8 +95,9 @@ process_execute (const char *file_name)
   //add to parent's child_list
   //call sema_down on thread_current->child child ref from allelem -> parent_sema_ref
   if(parent_sema(false,tid) == -1){
-    return -1;
+	return -1;
   }
+  printf("-------------returned-------------\n");
   //if not successful i.e exit_status is -1 "remove" ??  from parent's child_list and return tiderror
   // else return tid;
   return tid;
@@ -100,7 +110,7 @@ start_process (void *file_name_)
 {
   
   char *file_name = (char*)file_name_;
-  printf("IN START PROCESS %s \n",file_name);
+  //printf("IN START PROCESS %s \n",file_name);
   struct intr_frame if_;
   bool success;
   //char s[] = (char *)file_name_;
@@ -128,9 +138,32 @@ start_process (void *file_name_)
   //add the child in parent's thread child list in all the cases even if load is failed
   //to ensure that we can return its status in case of kernel termination
 
-
   success = load (cmd_arr[0], &if_.eip, &if_.esp);
+  printf("load complete\n");
   if(success){
+//
+
+struct thread *cur = thread_current ();
+	  if(cur->parent_ref != NULL){
+	     struct list child_list=cur->parent_ref->child_list;
+	     struct list_elem* e;
+	     tid_t thread_current_id = cur->tid;
+	     for (e = list_begin (&child_list); e != list_end (&child_list); e = list_next (e)){
+		      struct child_status* temp = list_entry(e, struct child_status, elem);
+		      if(temp->child_id == thread_current_id){
+		        if(!success)
+		          temp->exit_status = -1;
+		        break;
+		      }
+	     }
+	  }
+	  if(&thread_current()->parent_sema_ref != NULL){
+		printf("sema up\n");
+	  	sema_up(&(thread_current()->parent_sema_ref->sema));
+		thread_current()->parent_sema_ref = NULL;
+	  }
+
+////
      int len = i;
      int str_len;
      uint32_t ptr[len];
@@ -148,49 +181,33 @@ start_process (void *file_name_)
      }
      if_.esp-= 1;
      *((char *)if_.esp) = '\0';
-     ////if_.esp-= 4;
-     //*((uint32_t *)if_.esp) = (uint32_t)NULL;
+     if_.esp-= 4;
+     *((uint32_t *)if_.esp) = (uint32_t)NULL;
+     
+     for(int j=0; j<itr; j++){
+	if_.esp = if_.esp - 4;
+	memcpy((uint32_t*)if_.esp, &ptr[j], 4);
+     }
 
-    for(int j = itr-1;j>=0;j--){
-      //if_.esp--;
-      if_.esp = if_.esp - 4;
-      memcpy((uint32_t*)if_.esp, &ptr[j], 4);
-    }
     last = (uint32_t)if_.esp;
     if_.esp = if_.esp - 4;
     memcpy((uint32_t*)if_.esp, &last, 4);
     if_.esp -= 4;
-    //*((int *)if_.esp) = len;
     memcpy((uint32_t*)if_.esp, &len, 4);
     if_.esp -= 4;
     int end = 0;
     memcpy((uint32_t*)if_.esp, &end, 4);
-    hex_dump((uintptr_t)if_.esp,(char*)if_.esp,sizeof(char)*(PHYS_BASE-if_.esp),true);
+    
   }
-  struct thread *cur = thread_current ();
-  if(cur->parent_ref != NULL){
-     struct list child_list=cur->parent_ref->child_list;
-     struct list_elem* e;
-     tid_t thread_current_id = cur->tid;
-     for (e = list_begin (&child_list); e != list_end (&child_list); e = list_next (e)){
-              struct child_status* temp = list_entry(e, struct child_status, elem);
-              if(temp->child_id == thread_current_id){
-                if(!success)
-                  temp->exit_status = -1;
-                break;
-              }
-     }
-  }
-  sema_up(&(thread_current()->parent_sema_ref->sema));
+  
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) {
     //in case of load fail sema up the parent
     //child has not been added uptil now in the parent's thread child_list
-    
+    sema_up(&thread_current()->parent_sema_ref->sema);
     thread_exit ();
-  }
-
+  }s
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -200,9 +217,6 @@ start_process (void *file_name_)
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
-
-
-
 
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
@@ -216,9 +230,9 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-
    //while(1);
    //if(child_tid == NULL) return -1;
+   //printf("process wait called\n");
    return parent_sema(true,child_tid);
    
 }
@@ -228,6 +242,10 @@ void
 process_exit (void)
 {
   struct thread *cur = thread_current ();
+  if(cur->parent_sema_ref != NULL){
+	sema_up(&cur->parent_sema_ref->sema);
+	cur->parent_sema_ref = NULL;
+ }
   uint32_t *pd;
 
   /* Destroy the current process's page directory and switch back
@@ -247,7 +265,6 @@ process_exit (void)
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
-
     }
 }
 
@@ -257,7 +274,6 @@ process_exit (void)
 void
 process_activate (void)
 {
-  printf("inside process activate method\n");
   struct thread *t = thread_current ();
 
   /* Activate thread's page tables. */
@@ -344,6 +360,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 bool
 load (const char *file_name, void (**eip) (void), void **esp) 
 {
+  printf("----------------------%s\n----",file_name);
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -356,7 +373,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (t->pagedir == NULL) 
     goto done;
   process_activate ();
-
+  
   /* Open executable file. */
   file = filesys_open (file_name);
   if (file == NULL) 
@@ -436,14 +453,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
           break;
         }
     }
-
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
-
+    
+  // verify esp and eip
   success = true;
 
  done:
@@ -577,8 +594,6 @@ setup_stack (void **esp)
       else
         palloc_free_page (kpage);
     }
-    printf("\nI AM HERE ------------\n");
-    //hex_dump((uintptr_t)*esp,*esp,sizeof(char)*8,true);
   return success;
 }
 

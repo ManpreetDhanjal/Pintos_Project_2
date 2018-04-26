@@ -24,6 +24,18 @@ void close(int fd);
 
 struct lock syscall_lock;
 
+
+void
+verifyAddress(const void *uaddr){
+ printf("in verify\n");
+	if(uaddr == NULL || is_kernel_vaddr(uaddr) || is_kernel_vaddr(uaddr+4)
+			|| pagedir_get_page (thread_current()->pagedir, uaddr) == NULL){
+      //|| is_kernel_vaddr(pagedir_get_page (thread_current()->pagedir, uaddr))){
+      printf("exit called\n");
+  	  exit(-1);
+  }
+}
+
 void
 syscall_init (void) 
 {
@@ -34,69 +46,80 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  printf ("system call!\n");
+  //printf("----------syscall------\n");
+  verifyAddress(f->esp);
+  uint32_t* esp = (uint32_t*)f->esp;
   
-  if(f->esp==NULL || f->esp >= PHYS_BASE){
-  	  exit(-1);
-  }
-  lock_acquire(&syscall_lock);
+  //lock_acquire(&syscall_lock);
+  
   int sys_code = *(int*)f->esp;
-
+  int intArg=1;
+  
   switch(sys_code){
-   case SYS_HALT:
-        printf("--------------------Choice is halt---------------"); 
-   	halt();
+		case SYS_HALT:
+			halt();
     	break;
 
-    case SYS_EXIT: 
-	    printf("--------------------Choice is exit---------------");
-	    exit(*((int*)f->esp+1));
-	    break;
+    case SYS_EXIT:
+			intArg = *((int*)f->esp+1);
+			exit(intArg);
+			break;
 
     case SYS_WAIT: 
-	    printf("--------------------Choice is wait---------------");
-	    f->eax = wait((pid_t)*((int*)f->esp+1));
-	    break;
+      printf("wait--------\n");
+			f->eax = wait((pid_t)*((int*)f->esp+1));
+			break;
 
     case SYS_EXEC: 
-	    printf("--------------------Choice is exec---------------");
-	    f->eax = exec((char *)*((int*)f->esp+1));
-	    break;
+      printf("exce--------\n");
+			f->eax = exec((char *)*((int*)f->esp+1));
+			break;
 
     case SYS_CREATE: 
-    printf("Choice is 3");
-    break;
+    	printf("Choice is create");
+    	break;
 
     case SYS_REMOVE: 
-    printf("Choice is 3");
-    break;
+    	printf("Choice is 3");
+    		break;
 
     case SYS_FILESIZE: 
-    printf("Choice is 3");
+    	printf("Choice is 3");
     break;
 
     case SYS_WRITE: 
-    printf("Choice is 3");
-    break;
+    	esp = esp+1;
+    	uint32_t fd = *esp;
+    	esp = esp+1;
+    	char* buffer = (char*)(*esp);
+    	esp = esp+1;
+      verifyAddress((void*)esp);
+    	uint32_t size = *esp;
+    	f->eax = write(fd, buffer, size);
+    	break;
 
     case SYS_SEEK: 
-    printf("Choice is 3");
-    break;
+    	printf("Choice is seek");
+    	break;
 
     case SYS_TELL: 
-    printf("Choice is 3");
-    break;
+    	printf("Choice is 3");
+    	break;
 
     case SYS_CLOSE: 
-    printf("Choice is 3");
-    break;
+    	printf("Choice is 3");
+    	break;
+  
+    case SYS_OPEN:
+    	printf("choice is open");
+    	break;
 
     default: 
-    exit(-1);
-    break;  
+    	exit(-1);
+    	break;  
    }
 
-   lock_release(&syscall_lock);
+   //lock_release(&syscall_lock);
 
 }
 
@@ -107,12 +130,10 @@ halt (){
 
 void 
 exit(int status){
-  struct thread *cur = thread_current ();
+  printf ("%s: exit(%d)\n", thread_current()->name, status);
+  struct thread *cur = thread_current();
   
-  if(cur->parent_sema_ref != NULL){
-  	sema_up(&(cur->parent_sema_ref->sema));
-  	cur->parent_sema_ref = NULL;
-  }
+
   if(cur->parent_ref != NULL){
    struct list child_list=cur->parent_ref->child_list;
    struct list_elem* e;
@@ -124,10 +145,14 @@ exit(int status){
               break;
             }
    }
+   if(cur->parent_sema_ref != NULL){
+  	sema_up(&(cur->parent_sema_ref->sema));
+  	cur->parent_sema_ref = NULL;
   }
-
-  lock_release(&syscall_lock); 
-
+  }/*
+  if(syscall_lock.holder != NULL && syscall_lock.holder == thread_current()){
+  	lock_release(&syscall_lock); 
+  }*/
   thread_exit();
 }
 
@@ -142,6 +167,16 @@ wait(pid_t pid){
 pid_t
 exec(const char *cmd_line){
   return process_execute(cmd_line);
+}
+
+int 
+write(int fd, const void *buffer, unsigned size){
+	// convert fd to file struct pointer
+	if(fd == 1){ // print to console
+		putbuf(buffer, size);
+    return size;
+	}
+	return 0;
 }
 
 

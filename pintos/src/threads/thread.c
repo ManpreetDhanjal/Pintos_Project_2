@@ -20,16 +20,15 @@
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
-#define INF 32676
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
 
 /* List of all processes.  Processes are added to this list
-   when they are first scheduled and removed when they exit. */
+   when they are first scheduled and removed when they exit. 
 static struct list all_list;
-
+*/
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -175,7 +174,7 @@ thread_create (const char *name, int priority,
   tid_t tid;
 
   ASSERT (function != NULL);
-  printf("inside thread create method\n");
+  //printf("inside thread create method\n");
   /* Allocate thread. */
   t = palloc_get_page (PAL_ZERO);
   if (t == NULL)
@@ -186,11 +185,11 @@ thread_create (const char *name, int priority,
   tid = t->tid = allocate_tid ();
   #ifdef USERPROG
     struct child_status *cs = (struct child_status*)malloc(sizeof(struct child_status));
+    cs->child_id = tid;
     cs->exit_status = INF;
     cs->is_wait_called = false;
-    cs->allelem = t->allelem;
+    cs->allelem = &t->allelem;
     list_push_back (&thread_current()->child_list, &cs->elem);
-    
   #endif
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -291,7 +290,6 @@ void
 thread_exit (void) 
 {
   ASSERT (!intr_context ());
-
 #ifdef USERPROG
   process_exit ();
 #endif
@@ -475,7 +473,8 @@ init_thread (struct thread *t, const char *name, int priority)
   #ifdef USERPROG
     list_init (&t->child_list);
     t->parent_sema_ref = NULL; 
-    t->parent_ref = running_thread()->status == THREAD_RUNNING ? thread_current() : NULL;
+    //t->parent_ref = running_thread()->status == THREAD_RUNNING ? thread_current() : NULL;
+    t->parent_ref = running_thread();
   #endif
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

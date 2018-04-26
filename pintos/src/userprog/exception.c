@@ -71,7 +71,7 @@ exception_print_stats (void)
 static void
 kill (struct intr_frame *f) 
 {
-  struct thread *cur = thread_current ();
+  struct thread *cur = thread_current();
   if(cur->parent_ref != NULL){
      struct list child_list=cur->parent_ref->child_list;
      struct list_elem* e;

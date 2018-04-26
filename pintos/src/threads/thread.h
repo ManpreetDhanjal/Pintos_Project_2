@@ -23,7 +23,7 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
-
+#define INF 32676
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -80,6 +80,8 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+
+struct list all_list;
 
 struct blocked_node{
   struct semaphore sema;
@@ -152,7 +154,7 @@ struct child_status
   int exit_status;
   bool is_wait_called;
   struct list_elem elem;
-  struct list_elem allelem;
+  struct list_elem* allelem;
 };
 
 #endif /* threads/thread.h */
