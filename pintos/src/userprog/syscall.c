@@ -8,6 +8,8 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 
+
+#define STACK_BOUND 0x08048000
 static void syscall_handler (struct intr_frame *);
 
 void halt(void);
@@ -18,7 +20,7 @@ bool create(const char *file, unsigned initial_size);
 bool remove(const char *file);
 int open(const char *file);
 int filesize(int fd);
-int read(int fd, void *buffer, unsigned size);
+int read(int fd, const void *buffer, unsigned size);
 int write(int fd, const void *buffer, unsigned size);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
@@ -29,11 +31,12 @@ struct lock syscall_lock;
 
 void
 verifyAddress(const void *uaddr){
- //printf("in verify\n");
-	if(uaddr == NULL || is_kernel_vaddr(uaddr) || is_kernel_vaddr(uaddr+4)
-		|| (uint32_t*)pagedir_get_page (thread_current()->pagedir, uaddr) == NULL){
+  
+ 
+	if(uaddr == NULL || !is_user_vaddr(uaddr) || is_kernel_vaddr(uaddr) || is_kernel_vaddr(uaddr+4)
+		|| (uint32_t*)pagedir_get_page (thread_current()->pagedir, uaddr) == NULL || uaddr < STACK_BOUND){
       		//|| is_kernel_vaddr(pagedir_get_page (thread_current()->pagedir, uaddr))){
-     // printf("exit called\n");
+     
       exit(-1);
   }
 }
@@ -51,8 +54,10 @@ syscall_handler (struct intr_frame *f UNUSED)
   //printf("----------syscall------\n");
   verifyAddress(f->esp);
   uint32_t* esp = (uint32_t*)f->esp;
-  
-  //lock_acquire(&syscall_lock);
+  uint32_t fd;
+  uint32_t size;
+  char* buffer;
+  lock_acquire(&syscall_lock);
   
   int sys_code = *(int*)f->esp;
   int intArg=1;
@@ -68,37 +73,51 @@ syscall_handler (struct intr_frame *f UNUSED)
 			break;
 
     case SYS_WAIT: 
-      printf("wait--------\n");
+      //printf("wait--------\n");
 			f->eax = wait((pid_t)*((int*)f->esp+1));
 			break;
 
     case SYS_EXEC: 
-      printf("exce--------\n");
+      //printf("exce--------\n");
 			f->eax = exec((char *)*((int*)f->esp+1));
 			break;
 
     case SYS_CREATE: 
-    	printf("Choice is create");
+    	//printf("Choice is create");
     	break;
 
     case SYS_REMOVE: 
-    	printf("Choice is 3");
+    	//printf("Choice is 3");
     		break;
 
     case SYS_FILESIZE: 
-    	printf("Choice is 3");
+    	//printf("Choice is 3");
     break;
 
     case SYS_WRITE: 
     	esp = esp+1;
-    	uint32_t fd = *esp;
+      
+    	fd = *esp;
+      //printf("fd is %d\n ", fd);
     	esp = esp+1;
-    	char* buffer = (char*)(*esp);
+      buffer = (char*)(*esp);
     	esp = esp+1;
       verifyAddress((void*)esp);
-    	uint32_t size = *esp;
+      size = *esp;
+
     	f->eax = write(fd, buffer, size);
     	break;
+    case SYS_READ: 
+      esp = esp+1;
+      fd = *esp;
+      //printf("fd is %d\n", fd);
+      esp = esp+1;
+      buffer = (char*)(*esp);
+      esp = esp+1;
+      verifyAddress((void*)esp);
+      size = *esp;
+      f->eax = read(fd, buffer, size);
+      break;
 
     case SYS_SEEK: 
     	printf("Choice is seek");
@@ -121,7 +140,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     	break;  
    }
 
-   //lock_release(&syscall_lock);
+   lock_release(&syscall_lock);
 
 }
 
@@ -151,10 +170,10 @@ exit(int status){
   	sema_up(&(cur->parent_sema_ref->sema));
   	cur->parent_sema_ref = NULL;
   }
-  }/*
+  }
   if(syscall_lock.holder != NULL && syscall_lock.holder == thread_current()){
   	lock_release(&syscall_lock); 
-  }*/
+  }
   thread_exit();
 }
 
@@ -172,10 +191,29 @@ exec(const char *cmd_line){
 }
 
 int 
+read(int fd, const void *buffer, unsigned size){
+  // convert fd to file struct pointer
+  if(fd == 1 || fd < 0 || (buffer + size - 1) >= PHYS_BASE){
+    return -1;
+  }
+  else if(fd == 0){ // print to console
+    //buffer = input_getc();
+    return size;
+  }
+  return 0;
+}
+
+int 
 write(int fd, const void *buffer, unsigned size){
 	// convert fd to file struct pointer
-	if(fd == 1){ // print to console
+  
+  if(fd <= 0 || (buffer + size - 1) >= PHYS_BASE){
+    return -1;
+  }else if(fd == 1){ // print to console
+    verifyAddress((void*)(buffer+size-1));
+
 		putbuf(buffer, size);
+    
     return size;
 	}
 	return 0;

@@ -37,18 +37,19 @@ parent_sema(bool from_wait,tid_t child_tid){
             struct child_status* temp = list_entry(e, struct child_status, elem);
             if(temp->child_id == child_tid){
               child_ref=temp;
-    	      //printf("child ref id:%u\n", child_ref->child_id);
- 	      struct list_elem* thread_ref = child_ref->allelem;
+      	      
+   	          struct list_elem* thread_ref = child_ref->allelem;
               child_thread_ref = list_entry(thread_ref, struct thread, allelem);
-              if(temp->is_wait_called == true){
+              if(child_ref->is_wait_called == true){
                 return -1;
               }
-	      if(temp->exit_status != INF){
-		return temp->exit_status;
-	      }
+              child_ref->is_wait_called = from_wait;
+      	      if(child_ref->exit_status != INF){
+                		return temp->exit_status;
+          	  }
               child_thread_ref->parent_sema_ref = bn;
               child_status = &temp->exit_status;
-              temp->is_wait_called = from_wait;
+              
               break;
             }
    }
