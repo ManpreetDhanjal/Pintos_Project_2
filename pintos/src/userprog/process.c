@@ -32,12 +32,12 @@ parent_sema(bool from_wait,tid_t child_tid){
    struct child_status* child_ref;
    struct thread* child_thread_ref = NULL;
    int *child_status;
-   printf("parent sema called for :%u\n", child_tid);
+   //printf("parent sema called for :%u\n", child_tid);
    for (e = list_begin (&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)){
             struct child_status* temp = list_entry(e, struct child_status, elem);
             if(temp->child_id == child_tid){
               child_ref=temp;
-    	      printf("child ref id:%u\n", child_ref->child_id);
+    	      //printf("child ref id:%u\n", child_ref->child_id);
  	      struct list_elem* thread_ref = child_ref->allelem;
               child_thread_ref = list_entry(thread_ref, struct thread, allelem);
               if(temp->is_wait_called == true){
@@ -54,12 +54,12 @@ parent_sema(bool from_wait,tid_t child_tid){
    }
 
    if(child_thread_ref == NULL){
-      printf("child_ref isnull------------\n");
+      //printf("child_ref isnull------------\n");
       return -1;
    }
-printf("called sema donw\n");
+//printf("called sema donw\n");
    sema_down(&bn->sema);
-printf("child status is:%d\n", *child_status);
+//printf("child status is:%d\n", *child_status);
    return *child_status;
 }
 
@@ -97,7 +97,7 @@ process_execute (const char *file_name)
   if(parent_sema(false,tid) == -1){
 	return -1;
   }
-  printf("-------------returned-------------\n");
+  //printf("-------------returned-------------\n");
   //if not successful i.e exit_status is -1 "remove" ??  from parent's child_list and return tiderror
   // else return tid;
   return tid;
@@ -139,7 +139,7 @@ start_process (void *file_name_)
   //to ensure that we can return its status in case of kernel termination
 
   success = load (cmd_arr[0], &if_.eip, &if_.esp);
-  printf("load complete\n");
+  //printf("load complete\n");
   if(success){
 //
 
@@ -158,7 +158,7 @@ struct thread *cur = thread_current ();
 	     }
 	  }
 	  if(&thread_current()->parent_sema_ref != NULL){
-		printf("sema up\n");
+		//printf("sema up\n");
 	  	sema_up(&(thread_current()->parent_sema_ref->sema));
 		thread_current()->parent_sema_ref = NULL;
 	  }
@@ -207,7 +207,7 @@ struct thread *cur = thread_current ();
     //child has not been added uptil now in the parent's thread child_list
     sema_up(&thread_current()->parent_sema_ref->sema);
     thread_exit ();
-  }s
+  }
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -360,7 +360,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 bool
 load (const char *file_name, void (**eip) (void), void **esp) 
 {
-  printf("----------------------%s\n----",file_name);
+ // printf("----------------------%s\n----",file_name);
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;

@@ -6,6 +6,8 @@
 #include "threads/thread.h"
 #include "devices/shutdown.h"
 #include "threads/vaddr.h"
+#include "userprog/pagedir.h"
+
 static void syscall_handler (struct intr_frame *);
 
 void halt(void);
@@ -27,12 +29,12 @@ struct lock syscall_lock;
 
 void
 verifyAddress(const void *uaddr){
- printf("in verify\n");
+ //printf("in verify\n");
 	if(uaddr == NULL || is_kernel_vaddr(uaddr) || is_kernel_vaddr(uaddr+4)
-			|| pagedir_get_page (thread_current()->pagedir, uaddr) == NULL){
-      //|| is_kernel_vaddr(pagedir_get_page (thread_current()->pagedir, uaddr))){
-      printf("exit called\n");
-  	  exit(-1);
+		|| (uint32_t*)pagedir_get_page (thread_current()->pagedir, uaddr) == NULL){
+      		//|| is_kernel_vaddr(pagedir_get_page (thread_current()->pagedir, uaddr))){
+     // printf("exit called\n");
+      exit(-1);
   }
 }
 
