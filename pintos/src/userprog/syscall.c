@@ -33,9 +33,10 @@ void
 verifyAddress(const void *uaddr){
   
  
-	if(uaddr == NULL || !is_user_vaddr(uaddr) || is_kernel_vaddr(uaddr) || is_kernel_vaddr(uaddr+4)
-		|| (uint32_t*)pagedir_get_page (thread_current()->pagedir, uaddr) == NULL || uaddr < STACK_BOUND){
-      		//|| is_kernel_vaddr(pagedir_get_page (thread_current()->pagedir, uaddr))){
+	if(uaddr == NULL || !is_user_vaddr(uaddr) || is_kernel_vaddr(uaddr) || is_kernel_vaddr(uaddr+3)
+		|| pagedir_get_page (thread_current()->pagedir, uaddr) == NULL 
+		|| pagedir_get_page (thread_current()->pagedir, uaddr+3) == NULL
+		|| uaddr < STACK_BOUND){
      
       exit(-1);
   }
@@ -87,13 +88,12 @@ syscall_handler (struct intr_frame *f UNUSED)
 			break;
 
     case SYS_EXEC: 
-      //printf("exce--------\n");
-      lock_acquire(&syscall_lock);
-      //printf("lock_acquire by %s\n",thread_current()->name);
-			f->eax = exec((char *)*((int*)f->esp+1));
-      //printf("lock_release by %s\n",thread_current()->name);
-      lock_release(&syscall_lock);
-			break;
+      	esp = esp + 1;
+    	verifyAddress((void*)esp);
+	char* str = (char*)*esp;
+	verifyAddress((void*)str);
+	f->eax = exec((char *)*esp);
+	break;
 
     case SYS_CREATE: 
     	//printf("Choice is create");
