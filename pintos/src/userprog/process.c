@@ -32,7 +32,7 @@ parent_sema(bool from_wait,tid_t child_tid){
    struct child_status* child_ref;
    struct thread* child_thread_ref = NULL;
    int *child_status;
-   //printf("parent sema called for :%u\n", child_tid);
+   //printf("parent sema called for :%s\n", thread_current()->name);
    for (e = list_begin (&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)){
             struct child_status* temp = list_entry(e, struct child_status, elem);
             if(temp->child_id == child_tid){
@@ -71,7 +71,7 @@ parent_sema(bool from_wait,tid_t child_tid){
 tid_t
 process_execute (const char *file_name) 
 {
-  char *fn_copy;
+  char *fn_copy,*n_copy;
   tid_t tid;
   
   /* Make a copy of FILE_NAME.
@@ -79,12 +79,15 @@ process_execute (const char *file_name)
   
   //printf("IN PROCESS EXECUTE\n");
   fn_copy = palloc_get_page (0);
+  n_copy = palloc_get_page(0);
   if (fn_copy == NULL)
     return TID_ERROR;
   
   char *save_ptr;
+  //printf("here\n");
   strlcpy (fn_copy, file_name, PGSIZE);
-  char *token = strtok_r (file_name, " ", &save_ptr);
+  strlcpy (n_copy, file_name, PGSIZE);
+  char *token = strtok_r (n_copy, " ", &save_ptr);
   
   //printf("FIle name is %s\n", token);
   /* Create a new thread to execute FILE_NAME. */
@@ -233,7 +236,7 @@ process_wait (tid_t child_tid UNUSED)
 {
    //while(1);
    //if(child_tid == NULL) return -1;
-   //printf("process wait called\n");
+   //printf("process wait called on %s\n",thread_current()->name);
    return parent_sema(true,child_tid);
    
 }

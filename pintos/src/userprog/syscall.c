@@ -57,29 +57,42 @@ syscall_handler (struct intr_frame *f UNUSED)
   uint32_t fd;
   uint32_t size;
   char* buffer;
-  lock_acquire(&syscall_lock);
+  
   
   int sys_code = *(int*)f->esp;
   int intArg=1;
   
   switch(sys_code){
 		case SYS_HALT:
+    lock_acquire(&syscall_lock);
+    //printf("lock_acquire by %s\n",thread_current()->name);
 			halt();
+      //printf("lock_release by %s\n",thread_current()->name);
+      lock_release(&syscall_lock);
     	break;
 
     case SYS_EXIT:
+    //printf("----exit\n");
+      lock_acquire(&syscall_lock);
+      //printf("lock_acquire by %s\n",thread_current()->name);
 			intArg = *((int*)f->esp+1);
 			exit(intArg);
 			break;
 
     case SYS_WAIT: 
       //printf("wait--------\n");
+      //lock_acquire(&syscall_lock);
 			f->eax = wait((pid_t)*((int*)f->esp+1));
+
 			break;
 
     case SYS_EXEC: 
       //printf("exce--------\n");
+      lock_acquire(&syscall_lock);
+      //printf("lock_acquire by %s\n",thread_current()->name);
 			f->eax = exec((char *)*((int*)f->esp+1));
+      //printf("lock_release by %s\n",thread_current()->name);
+      lock_release(&syscall_lock);
 			break;
 
     case SYS_CREATE: 
@@ -95,6 +108,9 @@ syscall_handler (struct intr_frame *f UNUSED)
     break;
 
     case SYS_WRITE: 
+      //printf("write--------\n");
+      lock_acquire(&syscall_lock);
+      //printf("lock_acquire by %s\n",thread_current()->name);
     	esp = esp+1;
       
     	fd = *esp;
@@ -106,8 +122,13 @@ syscall_handler (struct intr_frame *f UNUSED)
       size = *esp;
 
     	f->eax = write(fd, buffer, size);
+      //printf("lock_release by %s\n",thread_current()->name);
+      lock_release(&syscall_lock);
     	break;
     case SYS_READ: 
+      //printf("read--------\n");
+      lock_acquire(&syscall_lock);
+      //printf("lock_acquire by %s\n",thread_current()->name);
       esp = esp+1;
       fd = *esp;
       //printf("fd is %d\n", fd);
@@ -117,6 +138,8 @@ syscall_handler (struct intr_frame *f UNUSED)
       verifyAddress((void*)esp);
       size = *esp;
       f->eax = read(fd, buffer, size);
+      //printf("lock_release by %s\n",thread_current()->name);
+      lock_release(&syscall_lock);
       break;
 
     case SYS_SEEK: 
@@ -140,7 +163,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     	break;  
    }
 
-   lock_release(&syscall_lock);
+   //
 
 }
 
@@ -172,6 +195,7 @@ exit(int status){
   }
   }
   if(syscall_lock.holder != NULL && syscall_lock.holder == thread_current()){
+   // printf("lock_release by %s\n",thread_current()->name);
   	lock_release(&syscall_lock); 
   }
   thread_exit();
@@ -181,6 +205,7 @@ exit(int status){
 int 
 wait(pid_t pid){
   if(pid == -1)return -1;
+  
   return process_wait(pid);
 }
 
