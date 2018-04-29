@@ -7,6 +7,8 @@
 #include "devices/shutdown.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
+#include "filesys/filesys.h"
+#include "filesys/file.h"
 
 
 #define STACK_BOUND 0x08048000
@@ -25,6 +27,7 @@ int write(int fd, const void *buffer, unsigned size);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
+struct file_details* list_itr(int fd);
 
 struct lock syscall_lock;
 
@@ -136,7 +139,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     	esp = esp+1;
       verifyAddress((void*)esp);
       size = *esp;
-    	f->eax = write(fd, buffer, size)
+    	f->eax = write(fd, buffer, size);
       lock_release(&syscall_lock);
     	break;
     case SYS_READ: 
@@ -184,7 +187,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       esp = esp+1;
       verifyAddress((void*)esp);
       fd = *esp;
-      f->eax = close(fd);
+      close(fd);
       lock_release(&syscall_lock);
     	//printf("Choice is 3");
     	break;
@@ -236,16 +239,18 @@ exit(int status){
   	cur->parent_sema_ref = NULL;
   }
   }
-  if(syscall_lock.holder != NULL && syscall_lock.holder == thread_current()){
-  	lock_release(&syscall_lock); 
-  }
+  
   //close all the file descriptors
   struct list_elem* e;
   for (e = list_begin (&thread_current()->files_list); e != list_end(&thread_current()->files_list); e = list_next(e)){
       struct file_details* temp = list_entry(e, struct file_details, elem);
       file_close(temp->file_ref);
-  }  
-  thread_current()->files_list = NULL;
+      list_remove(&temp->elem);
+  } 
+  if(syscall_lock.holder != NULL && syscall_lock.holder == thread_current()){
+    lock_release(&syscall_lock); 
+  } 
+  
   thread_exit();
 }
 
@@ -270,15 +275,16 @@ read(int fd, const void *buffer, unsigned size){
     return -1;
   }
   else if(fd == STDIN_FILENO){ // read from console
+    int i = 0;
     while(--size > 0){
-      *buffer = input_getc();
+      buffer = ((void *)input_getc());
       buffer++;
     }
     return size;
   }else{
-    struct file_details* detail = iterator(fd);
+    struct file_details* detail = list_itr(fd);
     if(detail != NULL){
-      return file_read (details->file_ref, buffer, size);
+      return file_read (detail->file_ref, buffer, size);
     }
   }
   return -1;
@@ -297,9 +303,9 @@ write(int fd, const void *buffer, unsigned size){
 		putbuf(buffer, size);
     return size;
 	}else{
-    struct file_details* detail = iterator(fd);
+    struct file_details* detail = list_itr(fd);
     if(detail != NULL){
-      return file_write (details->file_ref, buffer, size);
+      return file_write (detail->file_ref, buffer, size);
     }
   }
 	return -1;
@@ -329,7 +335,7 @@ void close(int fd){
   if(fd <= 1){
     exit(-1);
   }else{
-    struct file_details* detail = iterator(fd);
+    struct file_details* detail = list_itr(fd);
     if(detail != NULL){
       file_close(detail->file_ref);
       list_remove(&detail->elem);
@@ -342,7 +348,7 @@ int filesize(int fd){
   if(fd <= 1) {
     exit(-1);
   }
-  struct file_details* detail = iterator(fd);
+  struct file_details* detail = list_itr(fd);
   if(detail != NULL){
     return file_length(detail->file_ref);
   }
@@ -350,7 +356,7 @@ int filesize(int fd){
   return 0;
 }
 
-struct file_details* iterator(int fd){
+struct file_details* list_itr(int fd){
   struct list_elem* e;
   for (e = list_begin (&thread_current()->files_list); e != list_end(&thread_current()->files_list); e = list_next(e)){
       struct file_details* temp = list_entry(e, struct file_details, elem);
@@ -367,14 +373,14 @@ bool remove(const char *file){
 
 
 void seek(int fd, unsigned position){
-  struct file_details* detail = iterator(fd);
+  struct file_details* detail = list_itr(fd);
   if(detail != NULL){
     return file_seek(detail->file_ref,position);
   }
 }
 
 unsigned tell(int fd){
-  struct file_details* detail = iterator(fd);
+  struct file_details* detail = list_itr(fd);
   if(detail != NULL){
     return file_tell(detail->file_ref);
   }
