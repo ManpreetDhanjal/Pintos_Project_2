@@ -2,6 +2,7 @@
 #include "userprog/process.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include <stdlib.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "devices/shutdown.h"
@@ -102,6 +103,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       esp = esp+1;
       verifyAddress((void*)esp);
       file = (char *)*esp;
+      verifyAddress((void*)file);
       esp = esp+1;
       size = *esp;
       f->eax = create(file, size);
@@ -115,6 +117,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       verifyAddress((void*)esp);
       file = (char *)*esp;
       f->eax = remove(file);
+      lock_release(&syscall_lock);
       break;
 
     case SYS_FILESIZE: 
@@ -136,6 +139,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     	esp = esp+1;
       verifyAddress((void*)esp);
       buffer = (char*)(*esp);
+      verifyAddress((void*)buffer);
     	esp = esp+1;
       verifyAddress((void*)esp);
       size = *esp;
@@ -152,6 +156,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       esp = esp+1;
       verifyAddress((void*)esp);
       buffer = (char*)(*esp);
+      verifyAddress((void*)buffer);
       esp = esp+1;
       verifyAddress((void*)esp);
       size = *esp;
@@ -167,7 +172,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       fd = *esp;
       esp = esp+1;
       verifyAddress((void*)esp);
-      size = (char*)(*esp);
+      position = (*esp);
       seek(fd, position);
       lock_release(&syscall_lock);
     	break;
@@ -312,6 +317,7 @@ write(int fd, const void *buffer, unsigned size){
 }
 
 bool create(const char *file, unsigned initial_size){
+  if(file == NULL)exit(-1);
   return filesys_create(file,initial_size);
 }
 
@@ -321,13 +327,15 @@ int open(const char *file){
   if(ref == NULL){
     return -1;
   }else{
+
     struct file_details* fileList = (struct file_details*)malloc(sizeof(struct file_details));
-    fd = thread_current()->max_fd;
-    fileList->fd = thread_current()->max_fd;
-    thread_current()->max_fd++;
+    fd = thread_current()->max_fd++;
+    fileList->fd = fd;
+    
     fileList->file_ref = ref;
     list_push_back(&thread_current()->files_list,&fileList->elem);
   }
+
   return fd;
 }
 
