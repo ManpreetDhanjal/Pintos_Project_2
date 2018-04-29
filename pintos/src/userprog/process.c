@@ -130,7 +130,7 @@ start_process (void *file_name_)
       tok_len = strlen(token);
       cmd_arr[i] = (char *)malloc((tok_len+1) * sizeof(char));
       strlcpy(cmd_arr[i], token,tok_len+1);
-      cmd_arr[i][tok_len] = '\0';
+      //cmd_arr[i][tok_len] = '\0';
       i++;
    }
   /* Initialize interrupt frame and load executable. */
@@ -141,7 +141,7 @@ start_process (void *file_name_)
 
   //add the child in parent's thread child list in all the cases even if load is failed
   //to ensure that we can return its status in case of kernel termination
-
+  //printf("file name is %s\n",cmd_arr[0] );
   success = load (cmd_arr[0], &if_.eip, &if_.esp);
   //printf("load complete\n");
   if(success){
@@ -210,7 +210,8 @@ struct thread *cur = thread_current ();
     //in case of load fail sema up the parent
     //child has not been added uptil now in the parent's thread child_list
     sema_up(&thread_current()->parent_sema_ref->sema);
-    thread_exit ();
+    //thread_exit ();
+    exit(-1);
   }
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in

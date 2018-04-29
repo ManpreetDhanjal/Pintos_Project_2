@@ -32,11 +32,10 @@ struct lock syscall_lock;
 void
 verifyAddress(const void *uaddr){
   
- 
-	if(uaddr == NULL || !is_user_vaddr(uaddr) || is_kernel_vaddr(uaddr) || is_kernel_vaddr(uaddr+3)
+  //printf("uaddr %p\n", uaddr);
+	if(uaddr == NULL || !is_user_vaddr(uaddr) || uaddr <= STACK_BOUND || is_kernel_vaddr(uaddr) || is_kernel_vaddr(uaddr+3)
 		|| pagedir_get_page (thread_current()->pagedir, uaddr) == NULL 
-		|| pagedir_get_page (thread_current()->pagedir, uaddr+3) == NULL
-		|| uaddr < STACK_BOUND){
+		|| pagedir_get_page (thread_current()->pagedir, uaddr+3) == NULL){
      
       exit(-1);
   }
@@ -57,6 +56,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   uint32_t* esp = (uint32_t*)f->esp;
   uint32_t fd;
   uint32_t size;
+  char* file;
   char* buffer;
   
   
@@ -66,37 +66,42 @@ syscall_handler (struct intr_frame *f UNUSED)
   switch(sys_code){
 		case SYS_HALT:
     lock_acquire(&syscall_lock);
-    //printf("lock_acquire by %s\n",thread_current()->name);
 			halt();
-      //printf("lock_release by %s\n",thread_current()->name);
       lock_release(&syscall_lock);
     	break;
 
     case SYS_EXIT:
     //printf("----exit\n");
       lock_acquire(&syscall_lock);
-      //printf("lock_acquire by %s\n",thread_current()->name);
 			intArg = *((int*)f->esp+1);
 			exit(intArg);
 			break;
 
     case SYS_WAIT: 
       //printf("wait--------\n");
-      //lock_acquire(&syscall_lock);
 			f->eax = wait((pid_t)*((int*)f->esp+1));
 
 			break;
 
     case SYS_EXEC: 
+      lock_acquire(&syscall_lock);
       	esp = esp + 1;
     	verifyAddress((void*)esp);
-	char* str = (char*)*esp;
-	verifyAddress((void*)str);
-	f->eax = exec((char *)*esp);
+    	char* str = (char*)*esp;
+    	verifyAddress((void*)str);
+    	f->eax = exec((char *)*esp);
+      lock_release(&syscall_lock);
 	break;
 
     case SYS_CREATE: 
-    	//printf("Choice is create");
+      lock_acquire(&syscall_lock);
+      esp = esp+1;
+      verifyAddress((void*)esp);
+      file = (char *)*esp;
+      esp = esp+1;
+      size = *esp;
+      f->eax = create(file, size);
+      lock_release(&syscall_lock);
     	break;
 
     case SYS_REMOVE: 
@@ -110,25 +115,20 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_WRITE: 
       //printf("write--------\n");
       lock_acquire(&syscall_lock);
-      //printf("lock_acquire by %s\n",thread_current()->name);
     	esp = esp+1;
       
     	fd = *esp;
-      //printf("fd is %d\n ", fd);
     	esp = esp+1;
       buffer = (char*)(*esp);
     	esp = esp+1;
       verifyAddress((void*)esp);
       size = *esp;
-
-    	f->eax = write(fd, buffer, size);
-      //printf("lock_release by %s\n",thread_current()->name);
+    	f->eax = write(fd, buffer, size)
       lock_release(&syscall_lock);
     	break;
     case SYS_READ: 
       //printf("read--------\n");
       lock_acquire(&syscall_lock);
-      //printf("lock_acquire by %s\n",thread_current()->name);
       esp = esp+1;
       fd = *esp;
       //printf("fd is %d\n", fd);
@@ -138,7 +138,6 @@ syscall_handler (struct intr_frame *f UNUSED)
       verifyAddress((void*)esp);
       size = *esp;
       f->eax = read(fd, buffer, size);
-      //printf("lock_release by %s\n",thread_current()->name);
       lock_release(&syscall_lock);
       break;
 
@@ -155,13 +154,20 @@ syscall_handler (struct intr_frame *f UNUSED)
     	break;
   
     case SYS_OPEN:
-    	printf("choice is open");
+    	lock_acquire(&syscall_lock);
+      esp = esp+1;
+      verifyAddress((void*)esp);
+      file = (char *)*esp;
+      verifyAddress((void*)file);
+      f->eax = open(file);
+      lock_release(&syscall_lock);
     	break;
 
     default: 
     	exit(-1);
-    	break;  
+    	break; 
    }
+     
 
    //
 
@@ -195,7 +201,6 @@ exit(int status){
   }
   }
   if(syscall_lock.holder != NULL && syscall_lock.holder == thread_current()){
-   // printf("lock_release by %s\n",thread_current()->name);
   	lock_release(&syscall_lock); 
   }
   thread_exit();
@@ -235,16 +240,34 @@ write(int fd, const void *buffer, unsigned size){
   if(fd <= 0 || (buffer + size - 1) >= PHYS_BASE){
     return -1;
   }else if(fd == 1){ // print to console
+    verifyAddress((void*)(buffer));
     verifyAddress((void*)(buffer+size-1));
-
-		putbuf(buffer, size);
     
+		putbuf(buffer, size);
     return size;
 	}
 	return 0;
 }
 
+bool create(const char *file, unsigned initial_size){
+  return filesys_create(file,initial_size);
+}
 
+int open(const char *file){
+  struct file *ref = filesys_open(file);
+  int fd;
+  if(ref == NULL){
+    return -1;
+  }else{
+    struct file_details* fileList = (struct file_details*)malloc(sizeof(struct file_details));
+    fd = thread_current()->max_fd;
+    fileList->fd = thread_current()->max_fd;
+    thread_current()->max_fd++;
+    fileList->file_ref = ref;
+    list_push_back(&thread_current()->files_list,&fileList->elem);
+  }
+  return fd;
+}
 
 
 

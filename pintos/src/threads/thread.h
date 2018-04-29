@@ -106,6 +106,8 @@ struct thread
     struct list child_list;
     struct blocked_node* parent_sema_ref;
     struct thread* parent_ref;
+    struct list files_list;
+    int max_fd;
 #endif
 
     /* Owned by thread.c. */
@@ -155,6 +157,13 @@ struct child_status
   bool is_wait_called;
   struct list_elem elem;
   struct list_elem* allelem;
+};
+
+struct file_details
+{
+  int fd;
+  struct file *file_ref; 
+  struct list_elem elem;
 };
 
 #endif /* threads/thread.h */

@@ -472,7 +472,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   #ifdef USERPROG
     list_init (&t->child_list);
+    list_init(&t->files_list);
+    t->max_fd = 2;
     t->parent_sema_ref = NULL; 
+
     //t->parent_ref = running_thread()->status == THREAD_RUNNING ? thread_current() : NULL;
     t->parent_ref = running_thread();
   #endif
