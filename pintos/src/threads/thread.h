@@ -108,6 +108,7 @@ struct thread
     struct thread* parent_ref;
     struct list files_list;
     int max_fd;
+    struct file* executable;
 #endif
 
     /* Owned by thread.c. */

@@ -56,6 +56,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   uint32_t* esp = (uint32_t*)f->esp;
   uint32_t fd;
   uint32_t size;
+  uint32_t position;
   char* file;
   char* buffer;
   
@@ -106,19 +107,31 @@ syscall_handler (struct intr_frame *f UNUSED)
 
     case SYS_REMOVE: 
     	//printf("Choice is 3");
-    		break;
+      lock_acquire(&syscall_lock);
+      esp = esp+1;
+      verifyAddress((void*)esp);
+      file = (char *)*esp;
+      f->eax = remove(file);
+      break;
 
     case SYS_FILESIZE: 
     	//printf("Choice is 3");
+      lock_acquire(&syscall_lock);
+      esp = esp+1;
+      verifyAddress((void*)esp);
+      fd = *esp;
+      f->eax = filesize(fd);
+      lock_release(&syscall_lock);
     break;
 
     case SYS_WRITE: 
       //printf("write--------\n");
       lock_acquire(&syscall_lock);
     	esp = esp+1;
-      
+      verifyAddress((void*)esp);
     	fd = *esp;
     	esp = esp+1;
+      verifyAddress((void*)esp);
       buffer = (char*)(*esp);
     	esp = esp+1;
       verifyAddress((void*)esp);
@@ -130,9 +143,11 @@ syscall_handler (struct intr_frame *f UNUSED)
       //printf("read--------\n");
       lock_acquire(&syscall_lock);
       esp = esp+1;
+      verifyAddress((void*)esp);
       fd = *esp;
       //printf("fd is %d\n", fd);
       esp = esp+1;
+      verifyAddress((void*)esp);
       buffer = (char*)(*esp);
       esp = esp+1;
       verifyAddress((void*)esp);
@@ -142,15 +157,36 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
 
     case SYS_SEEK: 
-    	printf("Choice is seek");
+    	//printf("Choice is seek");
+      lock_acquire(&syscall_lock);
+      esp = esp+1;
+      verifyAddress((void*)esp);
+      fd = *esp;
+      esp = esp+1;
+      verifyAddress((void*)esp);
+      size = (char*)(*esp);
+      seek(fd, position);
+      lock_release(&syscall_lock);
     	break;
 
     case SYS_TELL: 
     	printf("Choice is 3");
+      lock_acquire(&syscall_lock);
+      esp = esp+1;
+      verifyAddress((void*)esp);
+      fd = *esp;
+      f->eax = tell(fd);
+      lock_release(&syscall_lock);
     	break;
 
     case SYS_CLOSE: 
-    	printf("Choice is 3");
+      lock_acquire(&syscall_lock);
+      esp = esp+1;
+      verifyAddress((void*)esp);
+      fd = *esp;
+      f->eax = close(fd);
+      lock_release(&syscall_lock);
+    	//printf("Choice is 3");
     	break;
   
     case SYS_OPEN:
@@ -203,6 +239,13 @@ exit(int status){
   if(syscall_lock.holder != NULL && syscall_lock.holder == thread_current()){
   	lock_release(&syscall_lock); 
   }
+  //close all the file descriptors
+  struct list_elem* e;
+  for (e = list_begin (&thread_current()->files_list); e != list_end(&thread_current()->files_list); e = list_next(e)){
+      struct file_details* temp = list_entry(e, struct file_details, elem);
+      file_close(temp->file_ref);
+  }  
+  thread_current()->files_list = NULL;
   thread_exit();
 }
 
@@ -223,30 +266,43 @@ exec(const char *cmd_line){
 int 
 read(int fd, const void *buffer, unsigned size){
   // convert fd to file struct pointer
-  if(fd == 1 || fd < 0 || (buffer + size - 1) >= PHYS_BASE){
+  if(fd == STDOUT_FILENO || fd < STDIN_FILENO || (buffer + size - 1) >= PHYS_BASE){
     return -1;
   }
-  else if(fd == 0){ // print to console
-    //buffer = input_getc();
+  else if(fd == STDIN_FILENO){ // read from console
+    while(--size > 0){
+      *buffer = input_getc();
+      buffer++;
+    }
     return size;
+  }else{
+    struct file_details* detail = iterator(fd);
+    if(detail != NULL){
+      return file_read (details->file_ref, buffer, size);
+    }
   }
-  return 0;
+  return -1;
 }
 
 int 
 write(int fd, const void *buffer, unsigned size){
 	// convert fd to file struct pointer
   
-  if(fd <= 0 || (buffer + size - 1) >= PHYS_BASE){
+  if(fd <= STDIN_FILENO || (buffer + size - 1) >= PHYS_BASE){
     return -1;
-  }else if(fd == 1){ // print to console
+  }else if(fd == STDOUT_FILENO){ // print to console
     verifyAddress((void*)(buffer));
     verifyAddress((void*)(buffer+size-1));
     
 		putbuf(buffer, size);
     return size;
-	}
-	return 0;
+	}else{
+    struct file_details* detail = iterator(fd);
+    if(detail != NULL){
+      return file_write (details->file_ref, buffer, size);
+    }
+  }
+	return -1;
 }
 
 bool create(const char *file, unsigned initial_size){
@@ -269,9 +325,61 @@ int open(const char *file){
   return fd;
 }
 
+void close(int fd){
+  if(fd <= 1){
+    exit(-1);
+  }else{
+    struct file_details* detail = iterator(fd);
+    if(detail != NULL){
+      file_close(detail->file_ref);
+      list_remove(&detail->elem);
+    }
+  }
+}
+
+int filesize(int fd){
+  
+  if(fd <= 1) {
+    exit(-1);
+  }
+  struct file_details* detail = iterator(fd);
+  if(detail != NULL){
+    return file_length(detail->file_ref);
+  }
+  exit(-1);
+  return 0;
+}
+
+struct file_details* iterator(int fd){
+  struct list_elem* e;
+  for (e = list_begin (&thread_current()->files_list); e != list_end(&thread_current()->files_list); e = list_next(e)){
+      struct file_details* temp = list_entry(e, struct file_details, elem);
+      if(temp->fd == fd){
+        return temp;
+      }
+  }
+  return NULL;
+}
+
+bool remove(const char *file){
+  return filesys_remove(file);
+}
 
 
+void seek(int fd, unsigned position){
+  struct file_details* detail = iterator(fd);
+  if(detail != NULL){
+    return file_seek(detail->file_ref,position);
+  }
+}
 
+unsigned tell(int fd){
+  struct file_details* detail = iterator(fd);
+  if(detail != NULL){
+    return file_tell(detail->file_ref);
+  }
+  return 0;
+}
 
 
 
