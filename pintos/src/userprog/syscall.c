@@ -37,6 +37,7 @@ void
 verifyAddress(const void *uaddr){
   
   //printf("uaddr %p\n", uaddr);
+  //printf("*uaddr ---%c----\n", *(char*)uaddr);
 	if(uaddr == NULL || !is_user_vaddr(uaddr) || uaddr <= STACK_BOUND || is_kernel_vaddr(uaddr) || is_kernel_vaddr(uaddr+3)
 		|| pagedir_get_page (thread_current()->pagedir, uaddr) == NULL 
 		|| pagedir_get_page (thread_current()->pagedir, uaddr+3) == NULL){
@@ -144,6 +145,9 @@ syscall_handler (struct intr_frame *f UNUSED)
     	esp = esp+1;
       verifyAddress((void*)esp);
       size = *esp;
+      for(int i=0; i<size; i++){
+    	verifyAddress(buffer+i);
+      }
     	f->eax = write(fd, buffer, size);
       lock_release(&syscall_lock);
     	break;
@@ -161,6 +165,9 @@ syscall_handler (struct intr_frame *f UNUSED)
       esp = esp+1;
       verifyAddress((void*)esp);
       size = *esp;
+for(int i=0; i<size; i++){
+    	verifyAddress(buffer+i);
+      }
       f->eax = read(fd, buffer, size);
       lock_release(&syscall_lock);
       break;

@@ -26,6 +26,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 int 
 parent_sema(bool from_wait,tid_t child_tid){
    struct blocked_node* bn = (struct blocked_node*)malloc(sizeof(struct blocked_node));
+   
    sema_init(&bn->sema,0);
    //struct list child_list=thread_current()->child_list;
    struct list_elem* e;
@@ -94,6 +95,7 @@ process_execute (const char *file_name)
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR){
      palloc_free_page (fn_copy); 
+     palloc_free_page(n_copy);
      printf("THREAD EXIT\n");
   }
   //add to parent's child_list
@@ -104,6 +106,7 @@ process_execute (const char *file_name)
   //printf("-------------returned-------------\n");
   //if not successful i.e exit_status is -1 "remove" ??  from parent's child_list and return tiderror
   // else return tid;
+  palloc_free_page(n_copy);
   return tid;
 }
 
@@ -206,6 +209,10 @@ struct thread *cur = thread_current ();
   
   /* If load failed, quit. */
   palloc_free_page (file_name);
+  for(int itr=i-1; itr>=0; itr--){
+	free(cmd_arr[itr]);
+  }
+  free(cmd_arr);
   if (!success) {
     //in case of load fail sema up the parent
     //child has not been added uptil now in the parent's thread child_list
@@ -250,7 +257,19 @@ process_exit (void)
   if(cur->parent_sema_ref != NULL){
 	sema_up(&cur->parent_sema_ref->sema);
 	cur->parent_sema_ref = NULL;
+  	free(cur->parent_sema_ref);
  }
+      struct list_elem* e;
+  	for (e = list_begin (&cur->files_list); e != list_end(&cur->files_list); e = list_next(e)){
+      		struct file_details* temp = list_entry(e, struct file_details, elem);
+      		file_close(temp->file_ref);
+      		list_remove(&temp->elem);
+  	}
+
+	for(e=list_begin (&thread_current()->child_list); e!=list_end(&thread_current()->child_list); e=list_next(e)){
+		struct child_status* temp = list_entry(e, struct child_status, elem);
+		list_remove(&temp->elem);
+	}
   uint32_t *pd;
 
   /* Destroy the current process's page directory and switch back
