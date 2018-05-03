@@ -4,7 +4,8 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-
+#include "threads/vaddr.h"
+#include "userprog/syscall.h"
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -71,19 +72,19 @@ exception_print_stats (void)
 static void
 kill (struct intr_frame *f) 
 {
-  struct thread *cur = thread_current();
-  if(cur->parent_ref != NULL){
-     struct list child_list=cur->parent_ref->child_list;
-     struct list_elem* e;
-     tid_t thread_current_id = cur->tid;
-     for (e = list_begin (&child_list); e != list_end (&child_list); e = list_next (e)){
-              struct child_status* temp = list_entry(e, struct child_status, elem);
-              if(temp->child_id == thread_current_id){
-                temp->exit_status = -1;
-                break;
-              }
-     }
-  }
+  // struct thread *cur = thread_current();
+  // if(cur->parent_ref != NULL){
+  //    struct list child_list=cur->parent_ref->child_list;
+  //    struct list_elem* e;
+  //    tid_t thread_current_id = cur->tid;
+  //    for (e = list_begin (&child_list); e != list_end (&child_list); e = list_next (e)){
+  //             struct child_status* temp = list_entry(e, struct child_status, elem);
+  //             if(temp->child_id == thread_current_id){
+  //               temp->exit_status = -1;
+  //               break;
+  //             }
+  //    }
+  // }
 
   /* This interrupt is one (probably) caused by a user process.
      For example, the process might have tried to access unmapped
@@ -161,7 +162,9 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-
+  if(is_kernel_vaddr (fault_addr) || not_present){
+    exit(-1);
+  }
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */

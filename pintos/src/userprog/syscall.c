@@ -78,6 +78,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_EXIT:
     //printf("----exit\n");
       lock_acquire(&syscall_lock);
+      verifyAddress((void *)f->esp+1);
 			intArg = *((int*)f->esp+1);
 			exit(intArg);
 			break;
