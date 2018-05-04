@@ -61,6 +61,7 @@ parent_sema(bool from_wait,tid_t child_tid){
    }
 //printf("called sema donw\n");
    sema_down(&bn->sema);
+   free(bn);
 //printf("child status is:%d\n", *child_status);
    return *child_status;
 }
@@ -90,13 +91,13 @@ process_execute (const char *file_name)
   strlcpy (n_copy, file_name, PGSIZE);
   char *token = strtok_r (n_copy, " ", &save_ptr);
   
-  //printf("FIle name is %s\n", token);
+  //printf("FIle name is %s\n", file_name);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR){
      palloc_free_page (fn_copy); 
      palloc_free_page(n_copy);
-     printf("THREAD EXIT\n");
+     //printf("THREAD EXIT\n");
   }
   //add to parent's child_list
   //call sema_down on thread_current->child child ref from allelem -> parent_sema_ref
@@ -106,6 +107,7 @@ process_execute (const char *file_name)
   //printf("-------------returned-------------\n");
   //if not successful i.e exit_status is -1 "remove" ??  from parent's child_list and return tiderror
   // else return tid;
+
   palloc_free_page(n_copy);
   return tid;
 }
@@ -210,7 +212,7 @@ struct thread *cur = thread_current ();
   /* If load failed, quit. */
   palloc_free_page (file_name);
   for(int itr=i-1; itr>=0; itr--){
-	free(cmd_arr[itr]);
+	 free(cmd_arr[itr]);
   }
   free(cmd_arr);
   if (!success) {
@@ -256,19 +258,23 @@ process_exit (void)
   struct thread *cur = thread_current ();
   if(cur->parent_sema_ref != NULL){
 	sema_up(&cur->parent_sema_ref->sema);
+  free(cur->parent_sema_ref);
 	cur->parent_sema_ref = NULL;
-  	free(cur->parent_sema_ref);
+  	
  }
       struct list_elem* e;
   	for (e = list_begin (&cur->files_list); e != list_end(&cur->files_list); e = list_next(e)){
       		struct file_details* temp = list_entry(e, struct file_details, elem);
       		file_close(temp->file_ref);
       		list_remove(&temp->elem);
+          free(temp);
   	}
 
 	for(e=list_begin (&thread_current()->child_list); e!=list_end(&thread_current()->child_list); e=list_next(e)){
 		struct child_status* temp = list_entry(e, struct child_status, elem);
 		list_remove(&temp->elem);
+    //free(temp);
+
 	}
   uint32_t *pd;
 

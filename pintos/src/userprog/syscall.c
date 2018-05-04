@@ -186,7 +186,7 @@ for(int i=0; i<size; i++){
     	break;
 
     case SYS_TELL: 
-    	printf("Choice is 3");
+    	//printf("Choice is 3");
       lock_acquire(&syscall_lock);
       esp = esp+1;
       verifyAddress((void*)esp);
@@ -206,6 +206,7 @@ for(int i=0; i<size; i++){
     	break;
   
     case SYS_OPEN:
+      //printf("opening file.....\n");
     	lock_acquire(&syscall_lock);
       esp = esp+1;
       verifyAddress((void*)esp);
