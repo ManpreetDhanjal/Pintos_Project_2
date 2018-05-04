@@ -256,11 +256,19 @@ exit(int status){
   
   //close all the file descriptors
   struct list_elem* e;
+  struct file_details* prev = NULL;
   for (e = list_begin (&thread_current()->files_list); e != list_end(&thread_current()->files_list); e = list_next(e)){
       struct file_details* temp = list_entry(e, struct file_details, elem);
+      if(prev != NULL){
+	free(prev);
+      }
       file_close(temp->file_ref);
       list_remove(&temp->elem);
+      prev = temp;
   } 
+  if(prev != NULL){
+	free(prev);
+  }
   if(syscall_lock.holder != NULL && syscall_lock.holder == thread_current()){
     lock_release(&syscall_lock); 
   } 

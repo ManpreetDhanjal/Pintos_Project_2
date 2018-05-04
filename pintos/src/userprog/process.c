@@ -262,14 +262,7 @@ process_exit (void)
 	cur->parent_sema_ref = NULL;
   	
  }
-      struct list_elem* e;
-  	for (e = list_begin (&cur->files_list); e != list_end(&cur->files_list); e = list_next(e)){
-      		struct file_details* temp = list_entry(e, struct file_details, elem);
-      		file_close(temp->file_ref);
-      		list_remove(&temp->elem);
-          free(temp);
-  	}
-
+	struct list_elem* e;
 	for(e=list_begin (&thread_current()->child_list); e!=list_end(&thread_current()->child_list); e=list_next(e)){
 		struct child_status* temp = list_entry(e, struct child_status, elem);
 		list_remove(&temp->elem);
